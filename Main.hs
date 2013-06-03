@@ -77,8 +77,12 @@ logArrival time user = modify $ \ (BotState log users) -> BotState (M.insertWith
 logDeparture :: UTCTime -> UserName -> Update BotState ()
 logDeparture time user = modify $ \ (BotState log users) -> BotState (M.insertWith mappend time (TimeSlice S.empty (S.singleton user) []) log) users
 
+forgetUser :: UserName -> Update BotState ()
+forgetUser user = modify $ \ (BotState log users) -> BotState log $ M.delete user users
+
 $(makeAcidic ''BotState [ 'getLog, 'getUserPrefs
                         , 'setDoLog , 'logMessage, 'logArrival, 'logDeparture
+                        , 'forgetUser
                         ])
 
 greeting :: [String]
@@ -146,6 +150,7 @@ logPart database = do
                 ("#snowdrift" : _) -> update' database $ LogMessage time message
                 ("snowbot" : "log" : _) -> update' database $ SetDoLog user True
                 ("snowbot" : "nolog" : _) -> update' database $ SetDoLog user False
+                ("snowbot" : "forget" : _) -> update' database $ ForgetUser user
 
     case IRC.msg_command message of
         "PRIVMSG" -> messaged
