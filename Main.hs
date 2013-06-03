@@ -88,10 +88,10 @@ greeting =
     , ""
     , "Respond with one of the following commands:"
     , "log"
-    , "\tenable logging"
+    , "    enable logging"
     , ""
     , "nolog"
-    , "\tdisable logging"
+    , "    disable logging"
     ]
 
 logPart :: AcidState BotState -> BotPartT IO ()
