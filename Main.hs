@@ -35,11 +35,16 @@ data TimeSlice = TimeSlice
                     , tsMessages :: [Message]
                     } deriving (Typeable)
 
+data UserPrefs = UserPrefs { upDoLog :: Bool } deriving (Typeable)
+
+defaultUserPrefs = UserPrefs { upDoLog = False }
+
 data BotState = BotState
                     { bsLog :: Map UTCTime TimeSlice
-                    , bsKnownUsers :: Set UserName
+                    , bsUserPrefs :: Map UserName UserPrefs
                     } deriving (Typeable)
 
+$(deriveSafeCopy 0 'base ''UserPrefs)
 $(deriveSafeCopy 0 'base ''IRC.Prefix)
 $(deriveSafeCopy 0 'base ''Message)
 $(deriveSafeCopy 0 'base ''TimeSlice)
@@ -57,24 +62,37 @@ instance Monoid TimeSlice where
 getLog :: Query BotState (Map UTCTime TimeSlice)
 getLog = ask >>= return . bsLog
 
-getKnownUsers :: Query BotState (Set UserName)
-getKnownUsers = ask >>= return . bsKnownUsers
+getUserPrefs :: UserName -> Query BotState (Maybe UserPrefs)
+getUserPrefs user = ask >>= return . M.lookup user . bsUserPrefs
+
+setDoLog :: UserName -> Bool -> Update BotState ()
+setDoLog user do_log = modify $ \ (BotState log prefs) -> BotState log $ M.insertWith (\ _ prefs -> prefs { upDoLog = do_log }) user (defaultUserPrefs { upDoLog = do_log }) prefs
 
 logMessage :: UTCTime -> Message -> Update BotState ()
 logMessage time message = modify $ \ (BotState log users) -> BotState (M.insertWith mappend time (TimeSlice S.empty S.empty [message]) log) users
                         
 logArrival :: UTCTime -> UserName -> Update BotState ()
-logArrival time user = modify $ \ (BotState log users) -> BotState (M.insertWith mappend time (TimeSlice (S.singleton user) S.empty []) log) (S.insert user users)
+logArrival time user = modify $ \ (BotState log users) -> BotState (M.insertWith mappend time (TimeSlice (S.singleton user) S.empty []) log) (M.insert user defaultUserPrefs users)
 
 logDeparture :: UTCTime -> UserName -> Update BotState ()
 logDeparture time user = modify $ \ (BotState log users) -> BotState (M.insertWith mappend time (TimeSlice S.empty (S.singleton user) []) log) users
 
-$(makeAcidic ''BotState [ 'getLog, 'getKnownUsers
-                        , 'logMessage, 'logArrival, 'logDeparture
+$(makeAcidic ''BotState [ 'getLog, 'getUserPrefs
+                        , 'setDoLog , 'logMessage, 'logArrival, 'logDeparture
                         ])
 
-greeting :: String
-greeting = "This is a test welcome message.  Welcome!"
+greeting :: [String]
+greeting =
+    [ "Welcome to #snowdrift!"
+    , "This bot provides some basic logging, to fill gaps when users are offline."
+    , ""
+    , "Respond with one of the following commands:"
+    , "log"
+    , "\tenable logging"
+    , ""
+    , "nolog"
+    , "\tdisable logging"
+    ]
 
 logPart :: AcidState BotState -> BotPartT IO ()
 logPart database = do
@@ -84,6 +102,7 @@ logPart database = do
     let departing :: BotPartT IO ()
         departing = do
             IRC.NickName user _ _ <- maybeZero $ IRC.msg_prefix message
+            logM Normal $ "NOTING THAT USER DEPARTED: " ++ user
             update' database $ LogDeparture time user
 
         arriving :: BotPartT IO ()
@@ -92,26 +111,29 @@ logPart database = do
 
             guard $ user /= "snowbot"
 
-            known_users <- query' database GetKnownUsers
+            prefs <- query' database $ GetUserPrefs user
             log <- query' database GetLog
 
-            if (S.member user known_users) 
-                then let messages :: [(UTCTime, Message)]
-                         messages = M.foldlWithKey (\ l t ts -> L.map (t ,) (tsMessages ts) ++ if (S.member user (tsLeft ts)) then [] else l) [] log
+            case prefs of
+                Just x | upDoLog x -> do
+                    let messages :: [(UTCTime, Message)]
+                        messages = M.foldlWithKey (\ l t ts -> L.map (t ,) (tsMessages ts) ++ if (S.member user (tsLeft ts)) then [] else l) [] log
 
-                         renderMessage :: UTCTime -> Message -> Maybe String
-                         renderMessage t (IRC.Message (Just (IRC.NickName name _ _)) "PRIVMSG" (sender:msg:_)) = Just $ show t ++ ": <" ++ name ++ "> " ++ msg
-                         renderMessage _ _ = Nothing
+                        renderMessage :: UTCTime -> Message -> Maybe String
+                        renderMessage t (IRC.Message (Just (IRC.NickName name _ _)) "PRIVMSG" (sender:msg:_)) = Just $ show t ++ ": <" ++ name ++ "> " ++ msg
+                        renderMessage _ _ = Nothing
 
-                         msg_list = case messages of
-                             [] -> [ "no missed messages" ]
-                             _ -> "you missed the following while away: " : reverse (L.mapMaybe (uncurry renderMessage) messages)
+                        msg_list = case messages of
+                            [] -> [ "no missed messages" ]
+                            _ -> "you missed the following while away: " : reverse (L.mapMaybe (uncurry renderMessage) messages)
 
-                      in do
-                        mapM_ (sendMessage . IRC.Message Nothing "PRIVMSG" . (user:) . (:[])) msg_list
+                    forM_ msg_list $ sendMessage . IRC.Message Nothing "PRIVMSG" . (user:) . (:[])
 
-                else sendMessage $ IRC.Message Nothing "PRIVMSG" [user, greeting]
+                Nothing -> forM_ greeting $ sendMessage . IRC.Message Nothing "PRIVMSG" . (user:) . (:[])
 
+                _ -> return ()
+
+            logM Normal $ "NOTING THAT USER ARRIVED: " ++ user
 
             update' database $ LogArrival time user
 
@@ -120,7 +142,10 @@ logPart database = do
             IRC.NickName user _ _ <- maybeZero $ IRC.msg_prefix message
             let channel : msg : _ = IRC.msg_params message
 
-            when (channel == "#snowdrift") $ update' database $ LogMessage time message
+            case IRC.msg_params message of
+                ("#snowdrift" : _) -> update' database $ LogMessage time message
+                ("snowbot" : "log" : _) -> update' database $ SetDoLog user True
+                ("snowbot" : "nolog" : _) -> update' database $ SetDoLog user False
 
     case IRC.msg_command message of
         "PRIVMSG" -> messaged
@@ -132,7 +157,7 @@ logPart database = do
 
 
 main = do
-    database <- openLocalState (BotState M.empty S.empty)
+    database <- openLocalState (BotState M.empty M.empty)
 
     let channels = S.singleton "#snowdrift"
         config = nullBotConf
