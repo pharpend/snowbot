@@ -35,7 +35,7 @@ data TimeSlice = TimeSlice
                     , tsMessages :: [Message]
                     } deriving (Typeable)
 
-data UserPrefs = UserPrefs { upDoLog :: Bool } deriving (Typeable)
+data UserPrefs = UserPrefs { upDoLog :: Bool } deriving (Show, Typeable)
 
 defaultUserPrefs = UserPrefs { upDoLog = False }
 
@@ -65,6 +65,9 @@ getLog = ask >>= return . bsLog
 getUserPrefs :: UserName -> Query BotState (Maybe UserPrefs)
 getUserPrefs user = ask >>= return . M.lookup user . bsUserPrefs
 
+getAllUserPrefs :: Query BotState (Map UserName UserPrefs)
+getAllUserPrefs = ask >>= return . bsUserPrefs
+
 setDoLog :: UserName -> Bool -> Update BotState ()
 setDoLog user do_log = modify $ \ (BotState log prefs) -> BotState log $ M.insertWith (\ _ prefs -> prefs { upDoLog = do_log }) user (defaultUserPrefs { upDoLog = do_log }) prefs
 
@@ -80,22 +83,25 @@ logDeparture time user = modify $ \ (BotState log users) -> BotState (M.insertWi
 forgetUser :: UserName -> Update BotState ()
 forgetUser user = modify $ \ (BotState log users) -> BotState log $ M.delete user users
 
-$(makeAcidic ''BotState [ 'getLog, 'getUserPrefs
+$(makeAcidic ''BotState [ 'getLog, 'getAllUserPrefs, 'getUserPrefs
                         , 'setDoLog , 'logMessage, 'logArrival, 'logDeparture
                         , 'forgetUser
                         ])
 
 greeting :: [String]
 greeting =
-    [ "Welcome to #snowdrift!"
-    , "This bot provides some basic logging, to fill gaps when users are offline."
-    , ""
-    , "Respond with one of the following commands:"
-    , "log"
-    , "    enable logging"
-    , ""
-    , "nolog"
-    , "    disable logging"
+    [ L.replicate 60 '*'
+    , "* Welcome to #snowdrift!"
+    , "* This bot provides some basic logging, to fill gaps when users are offline."
+    , "*"
+    , "* Respond with one of the following commands:"
+    , "* log"
+    , "*     enable logging"
+    , "*"
+    , "* nolog"
+    , "*     disable logging"
+    , "*"
+    , L.replicate 60 '*'
     ]
 
 logPart :: AcidState BotState -> BotPartT IO ()
@@ -114,6 +120,7 @@ logPart database = do
             IRC.NickName user _ _ <- maybeZero $ IRC.msg_prefix message
 
             guard $ user /= "snowbot"
+            guard $ user /= "snowbot-devel"
 
             prefs <- query' database $ GetUserPrefs user
             log <- query' database GetLog
@@ -148,9 +155,22 @@ logPart database = do
 
             case IRC.msg_params message of
                 ("#snowdrift" : _) -> update' database $ LogMessage time message
-                ("snowbot" : "log" : _) -> update' database $ SetDoLog user True
-                ("snowbot" : "nolog" : _) -> update' database $ SetDoLog user False
-                ("snowbot" : "forget" : _) -> update' database $ ForgetUser user
+
+                [ _, "log" ] -> do
+                    update' database $ SetDoLog user True
+                    sendMessage $ IRC.Message Nothing "PRIVMSG" [ user, "when you log in, you'll be sent messages since you last left" ]
+
+                [ _, "nolog" ] -> do
+                    update' database $ SetDoLog user False
+                    sendMessage $ IRC.Message Nothing "PRIVMSG" [ user, "you will no longer be sent messages on your return" ]
+
+                [ _, "forget" ] -> update' database $ ForgetUser user
+
+                [ _, "known_users" ] -> do
+                    prefs <- query' database GetAllUserPrefs
+                    forM_ (M.toAscList prefs) $ \ (u, p) -> sendMessage $ IRC.Message Nothing "PRIVMSG" [user, u ++ ": " ++ show p]
+
+                _ -> sendMessage $ IRC.Message Nothing "PRIVMSG" [user, "what?"]
 
     case IRC.msg_command message of
         "PRIVMSG" -> messaged
@@ -173,7 +193,7 @@ main = do
                                 { username = "snowbot"
                                 , hostname = "localhost"
                                 , servername = "irc.freenode.net"
-                                , realname = "Snowdrift bot"
+                                , realname = "Snowdrift bot - Development"
                                 }
                     , channels = channels
                     , limits = Just (10, 100)
@@ -187,7 +207,6 @@ main = do
         putStrLn $ "spawned thread " ++ show thread
 
     forever $ do
-        putStrLn "tick"
         threadDelay $ 60 * 1000 * 1000
 
 
