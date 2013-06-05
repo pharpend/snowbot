@@ -75,7 +75,7 @@ logMessage :: UTCTime -> Message -> Update BotState ()
 logMessage time message = modify $ \ (BotState log users) -> BotState (M.insertWith mappend time (TimeSlice S.empty S.empty [message]) log) users
                         
 logArrival :: UTCTime -> UserName -> Update BotState ()
-logArrival time user = modify $ \ (BotState log users) -> BotState (M.insertWith mappend time (TimeSlice (S.singleton user) S.empty []) log) (M.insert user defaultUserPrefs users)
+logArrival time user = modify $ \ (BotState log users) -> BotState (M.insertWith mappend time (TimeSlice (S.singleton user) S.empty []) log) (M.insertWith (flip const) user defaultUserPrefs users)
 
 logDeparture :: UTCTime -> UserName -> Update BotState ()
 logDeparture time user = modify $ \ (BotState log users) -> BotState (M.insertWith mappend time (TimeSlice S.empty (S.singleton user) []) log) users
