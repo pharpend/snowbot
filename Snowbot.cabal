@@ -15,12 +15,13 @@ Executable Snowbot
   Main-is:             Main.hs
   
   Build-depends: base
-               , containers	< 1.0
-               , text	        < 1.0
-               , time	        < 2.0
-               , mtl	        < 3.0
-               , irc		>= 0.5 && < 1.0
-               , ircbot		>= 0.5 && < 1.0
+               , containers     < 1.0
+               , text           < 1.0
+               , bytestring
+               , time           < 2.0
+               , mtl            < 3.0
+               , irc            >= 0.5 && < 1.0
+               , ircbot         >= 0.5 && < 1.0
                , acid-state     < 1.0
                , safecopy       < 1.0
 

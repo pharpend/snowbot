@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, TypeFamilies, DeriveDataTypeable, TupleSections #-}
+{-# LANGUAGE TemplateHaskell, TypeFamilies, DeriveDataTypeable, TupleSections, OverloadedStrings #-}
 
 import Network.IRC.Bot
 import Network.IRC (Message)
@@ -8,6 +8,7 @@ import Data.Set as S
 import Data.Map as M
 import Data.List as L
 import Data.Maybe as L (mapMaybe)
+import Data.ByteString.Char8 as BSC
 
 import Data.Time.Clock (UTCTime, getCurrentTime)
 
@@ -27,7 +28,7 @@ import Data.Acid
 import Data.Acid.Advanced
 import Data.SafeCopy
 
-type UserName = String
+type UserName = ByteString
 
 data TimeSlice = TimeSlice
                     { tsJoined :: Set UserName
@@ -88,9 +89,9 @@ $(makeAcidic ''BotState [ 'getLog, 'getAllUserPrefs, 'getUserPrefs
                         , 'forgetUser
                         ])
 
-greeting :: [String]
+greeting :: [ByteString]
 greeting =
-    [ L.replicate 60 '*'
+    [ BSC.replicate 60 '*'
     , "* Welcome to #snowdrift!"
     , "* This bot provides some basic logging, to fill gaps when users are offline."
     , "*"
@@ -101,7 +102,7 @@ greeting =
     , "* nolog"
     , "*     disable logging"
     , "*"
-    , L.replicate 60 '*'
+    , BSC.replicate 60 '*'
     ]
 
 logPart :: AcidState BotState -> BotPartT IO ()
@@ -112,7 +113,7 @@ logPart database = do
     let departing :: BotPartT IO ()
         departing = do
             IRC.NickName user _ _ <- maybeZero $ IRC.msg_prefix message
-            logM Normal $ "NOTING THAT USER DEPARTED: " ++ user
+            logM Normal $ "NOTING THAT USER DEPARTED: " <> user
             update' database $ LogDeparture time user
 
         arriving :: BotPartT IO ()
@@ -130,13 +131,13 @@ logPart database = do
                     let messages :: [(UTCTime, Message)]
                         messages = M.foldlWithKey (\ l t ts -> L.map (t ,) (tsMessages ts) ++ if (S.member user (tsLeft ts)) then [] else l) [] log
 
-                        renderMessage :: UTCTime -> Message -> Maybe String
-                        renderMessage t (IRC.Message (Just (IRC.NickName name _ _)) "PRIVMSG" (sender:msg:_)) = Just $ show t ++ ": <" ++ name ++ "> " ++ msg
+                        renderMessage :: UTCTime -> Message -> Maybe ByteString
+                        renderMessage t (IRC.Message (Just (IRC.NickName name _ _)) "PRIVMSG" (sender:msg:_)) = Just $ BSC.pack (show t) <> ": <" <> name <> "> " <> msg
                         renderMessage _ _ = Nothing
 
                         msg_list = case messages of
                             [] -> [ "no missed messages" ]
-                            _ -> "you missed the following while away: " : reverse (L.mapMaybe (uncurry renderMessage) messages)
+                            _ -> "you missed the following while away: " : L.reverse (L.mapMaybe (uncurry renderMessage) messages)
 
                     forM_ msg_list $ sendMessage . IRC.Message Nothing "PRIVMSG" . (user:) . (:[])
 
@@ -144,7 +145,7 @@ logPart database = do
 
                 _ -> return ()
 
-            logM Normal $ "NOTING THAT USER ARRIVED: " ++ user
+            logM Normal $ "NOTING THAT USER ARRIVED: " <> user
 
             update' database $ LogArrival time user
 
@@ -168,7 +169,7 @@ logPart database = do
 
                 [ _, "known_users" ] -> do
                     prefs <- query' database GetAllUserPrefs
-                    forM_ (M.toAscList prefs) $ \ (u, p) -> sendMessage $ IRC.Message Nothing "PRIVMSG" [user, u ++ ": " ++ show p]
+                    forM_ (M.toAscList prefs) $ \ (u, p) -> sendMessage $ IRC.Message Nothing "PRIVMSG" [user, u <> ": " <> BSC.pack (show p)]
 
                 _ -> sendMessage $ IRC.Message Nothing "PRIVMSG" [user, "what?"]
 
@@ -178,7 +179,7 @@ logPart database = do
         "PART" -> departing
         "JOIN" -> arriving
             
-        cmd -> logM Normal $ show time ++ ": unrecognized command: " ++ cmd
+        cmd -> logM Normal $ BSC.pack (show time) <> ": unrecognized command: " <> cmd
 
 
 main = do
@@ -202,9 +203,6 @@ main = do
     (channels_tvar, channels_part) <- initChannelsPart channels
 
     (threads, _) <- simpleBot config [pingPart, logPart database, channels_part]
-
-    forM threads $ \ thread -> do
-        putStrLn $ "spawned thread " ++ show thread
 
     forever $ do
         threadDelay $ 60 * 1000 * 1000
