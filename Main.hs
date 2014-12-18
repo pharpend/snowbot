@@ -28,6 +28,17 @@ import Data.Acid
 import Data.Acid.Advanced
 import Data.SafeCopy
 
+-------- Settings --------
+nickName :: ByteString
+nickName = "snowbot"
+
+realName :: ByteString
+realName = "Snowdrift bot - development"
+
+botChannel :: ByteString
+botChannel = "#snowdrift"
+--------------------------
+
 type UserName = ByteString
 
 data TimeSlice = TimeSlice
@@ -92,7 +103,7 @@ $(makeAcidic ''BotState [ 'getLog, 'getAllUserPrefs, 'getUserPrefs
 greeting :: [ByteString]
 greeting =
     [ BSC.replicate 60 '*'
-    , "* Welcome to #snowdrift!"
+    , "* Welcome to " <> botChannel <> "!"
     , "* This bot provides some basic logging, to fill gaps when users are offline."
     , "*"
     , "* Respond with one of the following commands:"
@@ -120,8 +131,8 @@ logPart database = do
         arriving = do
             IRC.NickName user _ _ <- maybeZero $ IRC.msg_prefix message
 
-            guard $ user /= "snowbot"
-            guard $ user /= "snowbot-devel"
+            guard $ user /= nickName
+            guard $ user /= nickName <> "-devel"
 
             prefs <- query' database $ GetUserPrefs user
             log <- query' database GetLog
@@ -155,7 +166,7 @@ logPart database = do
             let channel : msg : _ = IRC.msg_params message
 
             case IRC.msg_params message of
-                ("#snowdrift" : _) -> update' database $ LogMessage time message
+                (c : _) | c == botChannel -> update' database $ LogMessage time message
 
                 [ _, "log" ] -> do
                     update' database $ SetDoLog user True
@@ -178,23 +189,22 @@ logPart database = do
         "QUIT" -> departing
         "PART" -> departing
         "JOIN" -> arriving
-            
         cmd -> logM Normal $ BSC.pack (show time) <> ": unrecognized command: " <> cmd
 
 
 main = do
     database <- openLocalState (BotState M.empty M.empty)
 
-    let channels = S.singleton "#snowdrift"
+    let channels = S.singleton botChannel
         config = nullBotConf
                     { logger = stdoutLogger Debug
                     , host = "irc.freenode.net"
-                    , nick = "snowbot"
+                    , nick = nickName
                     , user = nullUser
-                                { username = "snowbot"
+                                { username = nickName
                                 , hostname = "localhost"
                                 , servername = "irc.freenode.net"
-                                , realname = "Snowdrift bot - Development"
+                                , realname = realName
                                 }
                     , channels = channels
                     , limits = Just (10, 100)
