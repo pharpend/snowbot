@@ -131,12 +131,12 @@ greeting =
     , "* Welcome to " <> botChannel <> "!"
     , "* This bot provides some basic logging, to fill gaps when users are offline."
     , "*"
-    , "* Respond with one of the following commands:"
+    , "* If you would like notice of comments you missed, reply with:"
     , "* log"
-    , "*     enable logging"
+    , "*     to enable logging"
     , "*"
     , "* nolog"
-    , "*     disable logging"
+    , "*     will later disable logging"
     , "*"
     , BSC.replicate 60 '*'
     ]
