@@ -155,7 +155,16 @@ logPart database = do
     time <- lift getCurrentTime
     message <- askMessage
 
-    let departing :: BotPartT IO ()
+    let sendMemos :: UserName -> BotPartT IO ()
+        sendMemos user = do
+            memos <- query' database $ GetMemos user
+            sendMessage $ case memos of
+                [] -> notice user "no memos"
+                _  -> IRC.privmsg user "some memos were left for you:"
+            forM_ (L.reverse memos) (sendMessage . memoToMessageFor user)
+            update' database $ ClearMemos user
+
+        departing :: BotPartT IO ()
         departing = do
             IRC.NickName user _ _ <- maybeZero $ IRC.msg_prefix message
             logM Normal $ "NOTING THAT USER DEPARTED: " <> user
@@ -170,13 +179,8 @@ logPart database = do
 
             prefs <- query' database $ GetUserPrefs user
             log   <- query' database GetLog
-            memos <- query' database $ GetMemos user
 
-            sendMessage $ case memos of
-                [] -> notice user "no memos"
-                _  -> IRC.privmsg user "some memos were left for you:"
-            forM_ (L.reverse memos) (sendMessage . memoToMessageFor user)
-            update' database $ ClearMemos user
+            sendMemos user
 
             case prefs of
                 Just x | upDoLog x -> do
