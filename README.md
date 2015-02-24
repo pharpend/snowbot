@@ -8,7 +8,7 @@ Snowbot has two main features:
 * __Memos__: you can send memos to other users which Snowbot will relay to them
   once they are back online.
 * __Logging__: Snowbot can log up to 10 lines of activity for you while you
-  are gone from the channel. If you have de logging preference enabled, Snowbot
+  are gone from the channel. If you have the logging preference enabled, Snowbot
   will show you the activity you missed (with a maximum of 10 lines) once you
   reenter the channel.
 
