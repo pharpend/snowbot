@@ -147,12 +147,24 @@ memoToMessageFor recipient (Memo time sender content) = IRC.privmsg recipient te
           sender' = "<" <> sender <> "> "
           text = time' <> ": " <> sender' <> content
 
+notice :: UserName -> ByteString -> Message
+notice nick msg = IRC.Message Nothing "NOTICE" [nick,msg]
+
 logPart :: AcidState BotState -> BotPartT IO ()
 logPart database = do
     time <- lift getCurrentTime
     message <- askMessage
 
-    let departing :: BotPartT IO ()
+    let sendMemos :: UserName -> BotPartT IO ()
+        sendMemos user = do
+            memos <- query' database $ GetMemos user
+            sendMessage $ case memos of
+                [] -> notice user "no memos"
+                _  -> IRC.privmsg user "some memos were left for you:"
+            forM_ (L.reverse memos) (sendMessage . memoToMessageFor user)
+            update' database $ ClearMemos user
+
+        departing :: BotPartT IO ()
         departing = do
             IRC.NickName user _ _ <- maybeZero $ IRC.msg_prefix message
             logM Normal $ "NOTING THAT USER DEPARTED: " <> user
@@ -167,13 +179,8 @@ logPart database = do
 
             prefs <- query' database $ GetUserPrefs user
             log   <- query' database GetLog
-            memos <- query' database $ GetMemos user
 
-            sendMessage $ case memos of
-                [] -> IRC.privmsg user "no memos"
-                _  -> IRC.privmsg user "some memos were left for you:"
-            forM_ (L.reverse memos) (sendMessage . memoToMessageFor user)
-            update' database $ ClearMemos user
+            sendMemos user
 
             case prefs of
                 Just x | upDoLog x -> do
@@ -184,11 +191,10 @@ logPart database = do
                         renderMessage t (IRC.Message (Just (IRC.NickName name _ _)) "PRIVMSG" (sender:msg:_)) = Just $ BSC.pack (show t) <> ": <" <> name <> "> " <> msg
                         renderMessage _ _ = Nothing
 
-                        msg_list = case messages of
-                            [] -> [ "no missed messages" ]
-                            _ -> "you missed the following while away: " : L.reverse (L.mapMaybe (uncurry renderMessage) messages)
-
-                    forM_ msg_list $ sendMessage . IRC.privmsg user
+                    case messages of
+                       [] -> sendMessage $ notice user "no missed messages"
+                       _ -> let msg_list = "you missed the following while away: " : L.reverse (L.mapMaybe (uncurry renderMessage) messages)
+                             in forM_ msg_list $ sendMessage . IRC.privmsg user
 
                 Nothing -> forM_ greeting $ sendMessage . IRC.privmsg user
 
