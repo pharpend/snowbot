@@ -19,9 +19,6 @@ messaging them to Snowbot, or by prefixing them with "snowbot", "snowbot:" or
 
 * __log__ and __nolog__: enable and disable your logging preference.
 * __forget__: removes all your preferences.
-* __known\_users__: private messages you all user preferences. You shouldn't
-  use this command on the main Snowbot, since the amount of users is so big
-  that the bot will be kicked from the server for flooding.
 * __memo__: send a memo to a user. Usage: memo [recipient] [message]
 
 ## Preferences
