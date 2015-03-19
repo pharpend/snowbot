@@ -243,10 +243,6 @@ logPart database = do
 
                 ["forget"] -> update' database $ ForgetUser user
 
-                ["known_users"] -> do
-                    prefs <- query' database GetAllUserPrefs
-                    forM_ (M.toAscList prefs) $ \ (u, p) -> sendMessage $ IRC.privmsg user (u <> ": " <> BSC.pack (show p))
-
                 ["memos"] -> do
                     sendMemos user
 
