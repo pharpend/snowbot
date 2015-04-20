@@ -5,7 +5,7 @@ License:             GPL-3
 License-file:        LICENSE
 Author:              David L. L. Thomas
 Maintainer:          davidleothomas@gmail.com
-Copyright:           &copy; 2013 Snowdrift.coop
+Copyright:           &copy; Snowdrift.coop
 Category:            Network
 Build-type:          Simple
 Cabal-version:       >=1.2
