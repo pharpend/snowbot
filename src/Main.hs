@@ -54,24 +54,6 @@ import Network.IRC.Bot.Part.Channels
 import Network.IRC.Bot.Part.Ping
 import qualified Network.IRC as IRC
 
-main :: IO ()
-main =
-  do database <- openLocalState $ BotState mempty mempty mempty
-     let channels = S.singleton botChannel
-         config =
-           nullBotConf {logger = stdoutLogger Debug
-                       ,host = "irc.freenode.net"
-                       ,nick = nickName
-                       ,user = nullUser {username = nickName
-                                        ,hostname = "localhost"
-                                        ,servername = "irc.freenode.net"
-                                        ,realname = realName}
-                       ,channels = channels
-                       ,limits = Just (10,100)}
-
-     (channels_tvar,channels_part) <- initChannelsPart channels
-     (threads,_) <- simpleBot config [pingPart,logPart database,channels_part]
-     forever $ do threadDelay $ 60 * 1000 * 1000
 
 -------- Settings --------
 nickName :: ByteString
@@ -427,3 +409,22 @@ logPart database =
          BSC.pack (show time) <>
          ": unrecognized command: " <>
          cmd
+
+main :: IO ()
+main =
+  do database <- openLocalState $ BotState mempty mempty mempty
+     let channels = S.singleton botChannel
+         config =
+           nullBotConf {logger = stdoutLogger Debug
+                       ,host = "irc.freenode.net"
+                       ,nick = nickName
+                       ,user = nullUser {username = nickName
+                                        ,hostname = "localhost"
+                                        ,servername = "irc.freenode.net"
+                                        ,realname = realName}
+                       ,channels = channels
+                       ,limits = Just (10,100)}
+
+     (channels_tvar,channels_part) <- initChannelsPart channels
+     (threads,_) <- simpleBot config [pingPart,logPart database,channels_part]
+     forever $ do threadDelay $ 60 * 1000 * 1000
