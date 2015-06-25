@@ -1,28 +1,31 @@
-Name:                Snowbot
-Version:             0.1
-Synopsis:            Bot for #snowdrift
-License:             GPL-3
-License-file:        LICENSE
-Author:              David L. L. Thomas
-Maintainer:          davidleothomas@gmail.com
-Copyright:           &copy; Snowdrift.coop
-Category:            Network
-Build-type:          Simple
-Cabal-version:       >=1.2
+name:                snowbot
+version:             0.1
+synopsis:            Bot for the #snowdrift IRC channel on Freenode
+license:             AGPL-3
+license-file:        LICENSE
+author:              David L. L. Thomas
+maintainer:          dev@lists.snowdrift.coop
+copyright:           Copyright (c) 2013-2015 Snowdrift.coop
+category:            Network
+build-type:          Simple
+cabal-version:       >=1.10
+extra-source-files:
+  LICENSE
+  README.md
 
-
-Executable Snowbot
-  Main-is:             Main.hs
-  
-  Build-depends: base
-               , containers     < 1.0
-               , text           < 1.0
-               , bytestring
-               , time           < 2.0
-               , mtl            < 3.0
-               , irc            >= 0.5 && < 1.0
-               , ircbot         >= 0.5 && < 1.0
-               , acid-state     < 1.0
-               , safecopy       < 1.0
-
+executable snowbot
+  main-is:             Main.hs
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+  build-depends:
+      acid-state
+    , base ==4.*
+    , bytestring                               
+    , containers
+    , irc >=0.6
+    , ircbot >=0.6
+    , mtl
+    , safecopy
+    , text
+    , time
 
