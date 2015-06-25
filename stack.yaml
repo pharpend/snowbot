@@ -1,0 +1,9 @@
+flags: {}
+resolver: lts-2.15
+packages:
+  - '.'
+extra-deps:
+  - irc-0.6.1.0
+  - ircbot-0.6.2
+  - acid-state-0.12.4
+  - SafeSemaphore-0.10.1
