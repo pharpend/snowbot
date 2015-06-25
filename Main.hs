@@ -4,6 +4,32 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 
+-- snowbot - bot for the #snowdrift channel on FreeNode
+-- Copyright (c) 2013-2015, Snowdrift.coop
+-- 
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU Affero General Public License as
+-- published by the Free Software Foundation, either version 3 of the
+-- License, or (at your option) any later version.
+-- 
+-- This program is distributed in the hope that it will be useful, but
+-- WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-- Affero General Public License for more details.
+-- 
+-- You should have received a copy of the GNU General Public License
+-- along with this program.  If not, see
+-- <http://www.gnu.org/licenses/agpl>.
+
+-- | 
+-- Module      : Main
+-- Description : Runs snowbot
+-- Copyright   : Copyright (c) 2013-2015, Snowdrift.coop
+-- License     : AGPL-3
+-- Maintainer  : dev@lists.snowdrift.coop
+-- Stability   : experimental
+-- Portability : POSIX
+
 module Main where
 
 import Control.Concurrent
@@ -27,6 +53,25 @@ import Network.IRC.Bot
 import Network.IRC.Bot.Part.Channels
 import Network.IRC.Bot.Part.Ping
 import qualified Network.IRC as IRC
+
+main :: IO ()
+main =
+  do database <- openLocalState $ BotState mempty mempty mempty
+     let channels = S.singleton botChannel
+         config =
+           nullBotConf {logger = stdoutLogger Debug
+                       ,host = "irc.freenode.net"
+                       ,nick = nickName
+                       ,user = nullUser {username = nickName
+                                        ,hostname = "localhost"
+                                        ,servername = "irc.freenode.net"
+                                        ,realname = realName}
+                       ,channels = channels
+                       ,limits = Just (10,100)}
+
+     (channels_tvar,channels_part) <- initChannelsPart channels
+     (threads,_) <- simpleBot config [pingPart,logPart database,channels_part]
+     forever $ do threadDelay $ 60 * 1000 * 1000
 
 -------- Settings --------
 nickName :: ByteString
@@ -382,25 +427,3 @@ logPart database =
          BSC.pack (show time) <>
          ": unrecognized command: " <>
          cmd
-
-main =
-  do database <-
-       openLocalState (BotState M.empty M.empty M.empty)
-     let channels = S.singleton botChannel
-         config =
-           nullBotConf {logger =
-                          stdoutLogger Debug
-                       ,host = "irc.freenode.net"
-                       ,nick = nickName
-                       ,user =
-                          nullUser {username = nickName
-                                   ,hostname = "localhost"
-                                   ,servername = "irc.freenode.net"
-                                   ,realname = realName}
-                       ,channels = channels
-                       ,limits = Just (10,100)}
-     (channels_tvar,channels_part) <- initChannelsPart channels
-     (threads,_) <-
-       simpleBot config [pingPart,logPart database,channels_part]
-     forever $
-       do threadDelay $ 60 * 1000 * 1000
