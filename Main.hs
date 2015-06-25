@@ -1,32 +1,32 @@
-{-# LANGUAGE TemplateHaskell, TypeFamilies, DeriveDataTypeable, TupleSections, OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeFamilies #-}
 
-import Network.IRC.Bot
-import Network.IRC (Message)
-import qualified Network.IRC as IRC
-
-import Data.Set as S
-import Data.Map as M
-import Data.List as L
-import Data.Maybe as L (mapMaybe, maybeToList)
-import Data.ByteString.Char8 as BSC
-
-import Data.Time.Clock (UTCTime, getCurrentTime)
-
-import Data.Typeable
+module Main where
 
 import Control.Concurrent
 import Control.Monad
-import Control.Monad.Trans
-import Control.Monad.State.Class
 import Control.Monad.Reader.Class
-import Data.Monoid
-
-import Network.IRC.Bot.Part.Ping
-import Network.IRC.Bot.Part.Channels
-
+import Control.Monad.State.Class
+import Control.Monad.Trans
 import Data.Acid
 import Data.Acid.Advanced
+import Data.ByteString.Char8 as BSC
+import Data.List as L
+import Data.Map as M
+import Data.Maybe as L (mapMaybe, maybeToList)
+import Data.Monoid
 import Data.SafeCopy
+import Data.Set as S
+import Data.Time.Clock (UTCTime, getCurrentTime)
+import Data.Typeable
+import Network.IRC (Message)
+import Network.IRC.Bot
+import Network.IRC.Bot.Part.Channels
+import Network.IRC.Bot.Part.Ping
+import qualified Network.IRC as IRC
 
 -------- Settings --------
 nickName :: ByteString
